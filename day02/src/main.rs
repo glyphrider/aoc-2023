@@ -1,4 +1,5 @@
 use core::cmp::max;
+use regex::Regex;
 
 fn main() {
     let lines = include_str!("../input.txt");
@@ -32,11 +33,11 @@ fn parse_game(game_string: &str) -> [u32; 3] {
 }
 
 fn parse_line(line: &str) -> (u32,[u32;3]) {
-    let parsed = line.split(':').collect::<Vec<&str>>();
-    let game_title = parsed[0].trim();
-    let game_string = parsed[1].trim();
-    let game_id = game_title[5..].parse::<u32>().unwrap();
-    return (game_id, parse_game(game_string));
+    let re = Regex::new(r"^Game (\d+)$").unwrap();
+    let parsed = line.split(':').map(|part| part.trim()).collect::<Vec<&str>>();
+    let (_,[id_string]) = re.captures(parsed[0]).unwrap().extract();
+    let game_id = id_string.parse::<u32>().unwrap();
+    return (game_id, parse_game(parsed[1]));
 }
 
 fn part1(lines: &str, max_r: u32,max_g: u32,max_b: u32) -> u32 {
