@@ -1,76 +1,111 @@
-struct ColorCount {
-    red: u32,
-    green: u32,
-    blue: u32,
-}
+use core::cmp::max;
 
 fn main() {
-    let lines: Vec<String> = std::fs::read_to_string("input.txt")
-        .unwrap()
-        .lines()
-        .map(String::from)
-        .collect();
-
-    let mut result1 = 0;
-    let mut result2 = 0;
-    let mut count: ColorCount = ColorCount {
-        red: 0,
-        blue: 0,
-        green: 0,
-    };
-    for line in lines {
-        println!("line = {}", line);
-        let game_number = extract_game(&line);
-        if get_max_colors(&line, &mut count) {
-            result1 = result1 + game_number;
-        }
-        result2 = result2 + (count.red * count.green * count.blue);
-    }
+    let lines = include_str!("../input.txt");
+    let result1 = part1(lines,12,13,14);
+    let result2 = part2(lines);
     println!("total1: {}", result1);
     println!("total2: {}", result2);
 }
 
-fn split_at_colon(line: &str) -> Vec<&str> {
-    return line.split(":").map(str::trim).collect();
+fn parse_draw(draw_string: &str) -> [u32; 3] {
+    return draw_string.split(',').into_iter().fold(
+        [0,0,0],|[r,g,b], cubes| {
+            let els = cubes.trim().split(' ').collect::<Vec<&str>>();
+            let count = els[0].parse().unwrap();
+            return match els[1] {
+                "red" => [count,g,b],
+                "green" => [r,count,b],
+                "blue" => [r,g,count],
+                _ => [r,g,b],
+            };
+        });
 }
 
-fn extract_game(line: &str) -> u32 {
-    let v: Vec<&str> = split_at_colon(line);
-    // println!("v = {},{}",v[0],v[1]);
-    let game_number = u32::from_str_radix(&v[0][5..], 10).unwrap();
-    return game_number;
+fn parse_game(game_string: &str) -> [u32; 3] {
+    return game_string.split(';').into_iter().fold(
+        [0,0,0], | [r_max,g_max,b_max], draw_string | {
+            let [r,g,b] = parse_draw(draw_string.trim());
+            return [ max(r_max,r),max(g_max,g),max(b_max,b)];
+        } 
+    )
 }
 
-fn get_max_colors(line: &str, count: &mut ColorCount) -> bool {
-    let mut result = true;
-    let v = split_at_colon(line);
-    let draws: Vec<&str> = v[1].split(";").collect();
-    count.red = 0;
-    count.blue = 0;
-    count.green = 0;
-    for draw in draws {
-       println!("draw = {}", draw);
-        let cubes: Vec<&str> = draw.split(",").map(str::trim).collect();
-        for cube in cubes {
-            println!("  cube = {}", cube);
-            let cube_split: Vec<&str> = cube.split(" ").map(str::trim).collect();
-            let cube_count = u32::from_str_radix(cube_split[0], 10).unwrap();
-            match cube_split[1] {
-                "red" => count.red = count.red.max(cube_count),
-                "blue" => count.blue = count.blue.max(cube_count),
-                "green" => count.green = count.green.max(cube_count),
-                &_ => println!("  *** bad color ***"),
-            }
+fn parse_line(line: &str) -> (u32,[u32;3]) {
+    let parsed = line.split(':').collect::<Vec<&str>>();
+    let game_title = parsed[0].trim();
+    let game_string = parsed[1].trim();
+    let game_id = game_title[5..].parse::<u32>().unwrap();
+    return (game_id, parse_game(game_string));
+}
+
+fn part1(lines: &str, max_r: u32,max_g: u32,max_b: u32) -> u32 {
+    return lines.lines().fold(0,|result, line| {
+        let (game_id,[r,g,b]) = parse_line(line);
+        if r <= max_r && g <= max_g && b <= max_b {
+            return result + game_id;
+        } else {
+            return result;
         }
-        if count.red > 12 {
-            result = false;
-        }
-        if count.green > 13 {
-            result = false;
-        }
-        if count.blue > 14 {
-            result = false;
-        }
+    });
+}
+
+fn part2(lines: &str) -> u32 {
+    return lines.lines().fold(0,|power,line| {
+        let (_game_id,[r,g,b]) = parse_line(line);
+        return power + r*g*b;
+    });
+}
+
+#[cfg(test)]
+mod test_part1 {
+    #[test]
+    fn parse_draw_1_red_test() {
+        assert_eq!(crate::parse_draw("1 red"),[1,0,0]);
     }
-    return result;
+    #[test]
+    fn parse_draw_1_red_1_green_test() {
+        assert_eq!(crate::parse_draw("1 red, 1 green"),[1,1,0]);
+    }
+    #[test]
+    fn parse_draw_1_green_test() {
+        assert_eq!(crate::parse_draw("1 green"),[0,1,0]);
+    }
+    #[test]
+    fn parse_draw_3_blue_1_green_2_red_test() {
+        assert_eq!(crate::parse_draw("3 blue, 1 green, 2 red"),[2,1,3]);
+    }
+
+    #[test]
+    fn parse_game1_contents_for_max_cube_counts_test() {
+        assert_eq!(crate::parse_game("3 blue, 4 red; 1 red, 2 green, 6 blue; 2 green"),[4,2,6]);
+    }
+
+    #[test]
+    fn parse_line_return_game_number_and_counts() {
+        assert_eq!(crate::parse_line("Game 5: 3 blue, 4 red; 1 red, 2 green, 6 blue; 2 green"),(5,[4,2,6]));
+    }
+
+    #[test]
+    fn parse_input_sample_1_test() {
+        assert_eq!(crate::part1(include_str!("../sample1.txt"),12,13,14),8);
+    }
+
+    #[test]
+    fn parse_input_test() {
+        assert_eq!(crate::part1(include_str!("../input.txt"),12,13,14),2617);
+    }
+}
+
+#[cfg(test)]
+mod test_part2 {
+
+    #[test]
+    fn parse_input_sample_1_test() {
+        assert_eq!(crate::part2(include_str!("../sample1.txt")),2286);
+    }
+    #[test]
+    fn parse_input_test() {
+        assert_eq!(crate::part2(include_str!("../input.txt")),59795);
+    }
 }
