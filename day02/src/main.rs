@@ -33,11 +33,9 @@ fn parse_game(game_string: &str) -> [u32; 3] {
 }
 
 fn parse_line(line: &str) -> (u32,[u32;3]) {
-    let re = Regex::new(r"^Game (\d+)$").unwrap();
     let parsed = line.split(':').map(|part| part.trim()).collect::<Vec<&str>>();
-    let (_,[id_string]) = re.captures(parsed[0]).unwrap().extract();
-    let game_id = id_string.parse::<u32>().unwrap();
-    return (game_id, parse_game(parsed[1]));
+    let (_,[id_string]) = Regex::new(r"^Game (\d+)$").unwrap().captures(parsed[0]).unwrap().extract();
+    return (id_string.parse::<u32>().unwrap(), parse_game(parsed[1]));
 }
 
 fn part1(lines: &str, max_r: u32,max_g: u32,max_b: u32) -> u32 {
