@@ -1,83 +1,86 @@
-use std::{fs::File, io::{BufReader,prelude::*}};
+struct Card {
+    id: u32,
+    winners: Vec<u32>,
+    numbers: Vec<u32>,
+}
 
 fn main() {
-    let file = File::open("input.txt").unwrap();
-    let mut bufr = BufReader::new(file);
-    let mut result1: u32 = 0;
-    let mut result2: u32 = 0;
-    let mut card_line = String::new();
-    let mut line_number: usize = 0;
-    let mut copies: Vec<u32> = vec![];
-    loop {
-        match bufr.read_line(&mut card_line) {
-            Ok(0) => break,
-            Err(e) => println!("unexpected error {}", e),
-
-            Ok(_n) => {
-                while copies.len() <= line_number {
-                    copies.push(0);
-                }
-                let winner_count = process_card(&card_line.trim());
-                if winner_count > 0 {
-                    let base: u32 = 2;
-                    result1 = result1 + base.pow(winner_count - 1);
-                    while copies.len() - line_number <= winner_count.try_into().unwrap() {
-                        copies.push(0);
-                    }
-                    for copy in line_number..line_number+(<u32 as TryInto<usize>>::try_into(winner_count).unwrap()) {
-                        copies[copy+1] = copies[copy+1] + (copies[line_number] + 1);
-                    }
-                    // println!("line number {} has {} copies and {} winners",line_number,copies[line_number],winner_count);
-                }
-                result2 = result2 + (copies[line_number] + 1);
-                line_number = line_number + 1;
-            },
-        }
-        card_line.clear();
-    }
-    println!("result1 = {}",result1);
-    println!("result2 = {}",result2);
+    let result1 = read_cards(include_str!("../input.txt"));
+    println!("result1 = {}", result1);
+    // println!("result2 = {}", result2);
 }
 
-fn process_card(card_line: &str) -> u32 {
-    let mut my_winner_count = 0;
-    match card_line.find(':') {
-        None => return 0,
-        Some(colon) => {
-            let _card_number = card_line[5..colon].trim().parse::<u32>().unwrap();
-            let mut winning_vec = vec![];
-            // println!("processing card #{}", card_number);
-            match card_line.find('|') {
-                None => return 0,
-                Some(separator) => {
-                    let winning_str = card_line[colon+1..separator].trim();
-                    let my_numbers_str = card_line[separator+1..].trim();
-                    let _count_of_winners = process_winning_str(winning_str,&mut winning_vec);
-                    // println!("  winning numbers -> {}",count_of_winners);
-                    for my_number_str in my_numbers_str.split_ascii_whitespace() {
-                        let candidate = my_number_str.parse::<u32>().unwrap();
-                        if winning_vec.iter().any(|&winner| winner == candidate) {
-                            my_winner_count = my_winner_count + 1;
-                        };
-                    }
-                }
+fn read_card(input: &str) -> Card {
+    let mut card1 = input.split(':').map(|elem| elem.trim());
+    let header = card1.next().unwrap();
+    let all_numbers_string = card1.next().unwrap();
+    let re = regex::Regex::new(r"Card[[:space:]]+([[:digit:]]+)").unwrap();
+    let id = re.captures(header).unwrap()[1].trim().parse().unwrap();
+    let mut card2 = all_numbers_string.split('|').map(|elem| elem.trim());
+    let winners_string = card2.next().unwrap();
+    let numbers_string = card2.next().unwrap();
+    let mut winners: Vec<u32> = vec![];
+    let mut numbers: Vec<u32> = vec![];
+    winners_string
+        .split_whitespace()
+        .into_iter()
+        .map(|w| w.parse().unwrap())
+        .for_each(|w| winners.push(w));
+    numbers_string
+        .split_whitespace()
+        .into_iter()
+        .map(|n| n.parse().unwrap())
+        .for_each(|n| numbers.push(n));
+    return Card {
+        id: id,
+        winners: winners,
+        numbers: numbers,
+    };
+}
+
+fn value(card: Card) -> u32 {
+    return card
+        .winners
+        .iter()
+        .filter(|w| card.numbers.iter().any(|n| &n == w))
+        .fold(0, |acc, _| {
+            if acc == 0 {
+                return 1;
+            } else {
+                return acc * 2;
             }
-        }
-    }
-    // if my_winner_count > 0 {
-    //     let base: u32 = 2;
-    //     value  = base.pow(my_winner_count - 1);
-    // }
-    // println!("  found {} winners",my_winner_count);
-    return my_winner_count;
+        });
 }
 
-fn process_winning_str(winning_str: &str, winning_vec: &mut Vec<u32>) -> u32 {
-    let mut winners = 0;
-    for winning_number_str  in winning_str.split_ascii_whitespace() {
-        let winner = winning_number_str.parse::<u32>().unwrap();
-        winning_vec.insert(winning_vec.len(),winner);
-        winners = winners + 1;
+fn read_cards(input: &str) -> u32 {
+    return input
+        .lines()
+        .map(|line| crate::value(crate::read_card(line)))
+        .fold(0, |acc, value| acc + value);
+}
+
+#[cfg(test)]
+mod part1_test {
+    #[test]
+    fn read_card_test() {
+        let card = crate::read_card("Card 13: 12 13 14 15  1 |  2  5 10 12 14 20 55 66");
+        assert_eq!(card.id, 13);
+        assert_eq!(card.winners.len(), 5);
+        assert_eq!(card.numbers.len(), 8);
     }
-    return winners;
+
+    #[test]
+    fn sample1_line1_test() {
+        let card = crate::read_card("Card 1: 41 48 83 86 17 | 83 86  6 31 17  9 48 53");
+        assert_eq!(crate::value(card), 8);
+    }
+    #[test]
+    fn sample1_test() {
+        assert_eq!(crate::read_cards(include_str!("../sample1.txt")), 13);
+    }
+
+    #[test]
+    fn input_test() {
+        assert_eq!(crate::read_cards(include_str!("../input.txt")), 25004);
+    }
 }
